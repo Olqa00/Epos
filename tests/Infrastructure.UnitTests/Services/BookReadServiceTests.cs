@@ -56,6 +56,12 @@ public sealed class BookReadServiceTests
     };
 
     private readonly NpgsqlConnection connection = new(CONNECTION_STRING);
+
+    private readonly PersistenceOptions options = new()
+    {
+        ConnectionString = CONNECTION_STRING,
+    };
+
     private readonly DocumentStore store;
 
     private Respawner? respawner = default;
@@ -74,7 +80,7 @@ public sealed class BookReadServiceTests
     public async Task GetBooksAsync_Should_GetBooks()
     {
         // Arrange
-        var readService = new BookReadService(this.store);
+        var readService = new BookReadService(this.options, this.store);
         await readService.InsertAsync(BOOK_ID_1, TITLE, DETAILS, CancellationToken.None);
         await readService.InsertAsync(BOOK_ID_2, TITLE_2, DETAILS_WITH_EXTERNAL_ID, CancellationToken.None);
 
@@ -91,7 +97,7 @@ public sealed class BookReadServiceTests
     public async Task GetByIdAsync_Should_GetBook()
     {
         // Arrange
-        var readService = new BookReadService(this.store);
+        var readService = new BookReadService(this.options, this.store);
         await readService.InsertAsync(BOOK_ID_1, TITLE, DETAILS, CancellationToken.None);
 
         // Act
@@ -107,7 +113,7 @@ public sealed class BookReadServiceTests
     public async Task GetByNumberOfPagesAsync_Should_GetBook()
     {
         // Arrange
-        var readService = new BookReadService(this.store);
+        var readService = new BookReadService(this.options, this.store);
         await readService.InsertAsync(BOOK_ID_1, TITLE, DETAILS, CancellationToken.None);
 
         // Act
@@ -123,11 +129,11 @@ public sealed class BookReadServiceTests
     public async Task GetByNumberOfPagesReturnBookResultAsync_Should_GetBook()
     {
         // Arrange
-        var readService = new BookReadService(this.store);
+        var readService = new BookReadService(this.options, this.store);
         await readService.InsertAsync(BOOK_ID_1, TITLE, DETAILS, CancellationToken.None);
 
         // Act
-        var result = await readService.GetByNumberOfPagesReturnBookResultAsync(DETAILS_NUMBER_OF_PAGES, CancellationToken.None);
+        var result = await readService.GetByNumberOfPagesReturnBookResultWithDapperAsync(DETAILS_NUMBER_OF_PAGES, CancellationToken.None);
 
         // Assert
         result.Should()
@@ -139,7 +145,7 @@ public sealed class BookReadServiceTests
     public async Task GetByNumberOfPagesWithScriptJsonAsync_Should_GetBook()
     {
         // Arrange
-        var readService = new BookReadService(this.store);
+        var readService = new BookReadService(this.options, this.store);
         await readService.InsertAsync(BOOK_ID_1, TITLE, DETAILS, CancellationToken.None);
 
         // Act
@@ -160,7 +166,7 @@ public sealed class BookReadServiceTests
     public async Task InsertAsync_Should_InsertBook()
     {
         // Arrange
-        var readService = new BookReadService(this.store);
+        var readService = new BookReadService(this.options, this.store);
 
         // Act
         await readService.InsertAsync(BOOK_ID_1, TITLE, DETAILS, CancellationToken.None);
@@ -180,12 +186,12 @@ public sealed class BookReadServiceTests
         // Arrange
         await this.connection.OpenAsync();
 
-        var options = new RespawnerOptions
+        var respawnerOptions = new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
         };
 
-        this.respawner = await Respawner.CreateAsync(this.connection, options);
+        this.respawner = await Respawner.CreateAsync(this.connection, respawnerOptions);
     }
 
     [TestCleanup]
