@@ -44,5 +44,8 @@ dotnet sln add ../src/Application.UnitTests
 dotnet sln add ../src/Domain.UnitTests
 dotnet sln add ../src/Infrastructure.UnitTests
 
+# Create new branch
+git branch develop
+
 # Add gitignore
 dotnet new gitignore
