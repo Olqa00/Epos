@@ -7,6 +7,17 @@ using Epos.Infrastructure.Result;
 
 internal sealed class BookReadService : IBookReadService
 {
+    private const string GET_BY_EXTERNAL_ID = """
+                                              SELECT json_build_object(
+                                                 'Id', (data ->> 'Id')::uuid,
+                                                 'EAN', data -> 'Details' ->> 'EAN',
+                                                 'SKU', data -> 'Details' ->> 'SKU'
+                                              ) AS result
+                                              FROM public.mt_doc_bookentity
+                                              WHERE (data -> 'Details' ->> 'EAN') = @ExternalId or (data -> 'Details' ->> 'SKU') = @ExternalId
+                                              LIMIT 1;
+                                              """;
+
     private const string GET_BY_NUMBER_OF_PAGES = """
                                                   WHERE (data -> 'Details' ->> 'NumberOfPages') = @Pages;
                                                   """;
@@ -58,6 +69,20 @@ internal sealed class BookReadService : IBookReadService
             .FirstOrDefaultAsync(cancellationToken);
 
         return book;
+    }
+
+    public async Task<BookExternalIdResult?> GetByExternalIdSqlAsync(string externalId, CancellationToken cancellationToken = default)
+    {
+        await using var session = this.storeReadService.QuerySession();
+
+        var parameters = new
+        {
+            ExternalId = externalId,
+        };
+
+        var result = (await session.QueryAsync<BookExternalIdResult>(GET_BY_EXTERNAL_ID, cancellationToken, parameters)).SingleOrDefault();
+
+        return result;
     }
 
     public async Task<BookEntity?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)

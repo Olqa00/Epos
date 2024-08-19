@@ -55,6 +55,13 @@ public sealed class BookReadServiceTests
         NumberOfPages = DETAILS_NUMBER_OF_PAGES,
     };
 
+    private static readonly BookExternalIdResult BOOK_EXTERNAL_ID_RESULT = new()
+    {
+        Id = BOOK_ID_2,
+        EAN = EAN,
+        SKU = SKU,
+    };
+
     private readonly NpgsqlConnection connection = new(CONNECTION_STRING);
 
     private readonly PersistenceOptions options = new()
@@ -122,6 +129,22 @@ public sealed class BookReadServiceTests
         // Assert
         result.Should()
             .BeEquivalentTo(BOOK_ENTITY_2)
+            ;
+    }
+
+    [TestMethod]
+    public async Task GetByExternalIdSqlAsync_Should_GetBookByEAN()
+    {
+        // Arrange
+        var readService = new BookReadService(this.options, this.store);
+        await readService.InsertAsync(BOOK_ID_2, TITLE_2, DETAILS_WITH_EXTERNAL_ID, CancellationToken.None);
+
+        // Act
+        var result = await readService.GetByExternalIdSqlAsync(EAN, CancellationToken.None);
+
+        // Assert
+        result.Should()
+            .BeEquivalentTo(BOOK_EXTERNAL_ID_RESULT)
             ;
     }
 
