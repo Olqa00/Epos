@@ -149,6 +149,22 @@ public sealed class BookReadServiceTests
     }
 
     [TestMethod]
+    public async Task GetByExternalIdSqlAsync_Should_GetBookBySKU()
+    {
+        // Arrange
+        var readService = new BookReadService(this.options, this.store);
+        await readService.InsertAsync(BOOK_ID_2, TITLE_2, DETAILS_WITH_EXTERNAL_ID, CancellationToken.None);
+
+        // Act
+        var result = await readService.GetByExternalIdSqlAsync(SKU, CancellationToken.None);
+
+        // Assert
+        result.Should()
+            .BeEquivalentTo(BOOK_EXTERNAL_ID_RESULT)
+            ;
+    }
+
+    [TestMethod]
     public async Task GetByIdAsync_Should_GetBook()
     {
         // Arrange

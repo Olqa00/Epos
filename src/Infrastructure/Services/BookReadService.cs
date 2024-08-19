@@ -14,7 +14,7 @@ internal sealed class BookReadService : IBookReadService
                                                  'SKU', data -> 'Details' ->> 'SKU'
                                               ) AS result
                                               FROM public.mt_doc_bookentity
-                                              WHERE (data -> 'Details' ->> 'EAN') = @ExternalId or (data -> 'Details' ->> 'SKU') = @ExternalId
+                                              WHERE ((data -> 'Details' ->> 'EAN') is not null and (data -> 'Details' ->> 'EAN') = @ExternalId) or ((data -> 'Details' ->> 'SKU')is not null and(data -> 'Details' ->> 'SKU') = @ExternalId)
                                               LIMIT 1;
                                               """;
 
