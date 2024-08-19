@@ -94,6 +94,38 @@ public sealed class BookReadServiceTests
     }
 
     [TestMethod]
+    public async Task GetByExternalIdAsync_Should_GetBookByEAN()
+    {
+        // Arrange
+        var readService = new BookReadService(this.options, this.store);
+        await readService.InsertAsync(BOOK_ID_2, TITLE_2, DETAILS_WITH_EXTERNAL_ID, CancellationToken.None);
+
+        // Act
+        var result = await readService.GetByExternalIdAsync(EAN, CancellationToken.None);
+
+        // Assert
+        result.Should()
+            .BeEquivalentTo(BOOK_ENTITY_2)
+            ;
+    }
+
+    [TestMethod]
+    public async Task GetByExternalIdAsync_Should_GetBookBySKU()
+    {
+        // Arrange
+        var readService = new BookReadService(this.options, this.store);
+        await readService.InsertAsync(BOOK_ID_2, TITLE_2, DETAILS_WITH_EXTERNAL_ID, CancellationToken.None);
+
+        // Act
+        var result = await readService.GetByExternalIdAsync(SKU, CancellationToken.None);
+
+        // Assert
+        result.Should()
+            .BeEquivalentTo(BOOK_ENTITY_2)
+            ;
+    }
+
+    [TestMethod]
     public async Task GetByIdAsync_Should_GetBook()
     {
         // Arrange
@@ -126,7 +158,7 @@ public sealed class BookReadServiceTests
     }
 
     [TestMethod]
-    public async Task GetByNumberOfPagesReturnBookResultAsync_Should_GetBook()
+    public async Task GetByNumberOfPagesReturnBookResultWithDapperAsync_Should_GetBook()
     {
         // Arrange
         var readService = new BookReadService(this.options, this.store);
@@ -134,6 +166,22 @@ public sealed class BookReadServiceTests
 
         // Act
         var result = await readService.GetByNumberOfPagesReturnBookResultWithDapperAsync(DETAILS_NUMBER_OF_PAGES, CancellationToken.None);
+
+        // Assert
+        result.Should()
+            .BeEquivalentTo(BOOK_NUMBER_OF_PAGES_RESULT)
+            ;
+    }
+
+    [TestMethod]
+    public async Task GetByNumberOfPagesReturnBookResultWithMartenAsync_Should_GetBook()
+    {
+        // Arrange
+        var readService = new BookReadService(this.options, this.store);
+        await readService.InsertAsync(BOOK_ID_1, TITLE, DETAILS, CancellationToken.None);
+
+        // Act
+        var result = await readService.GetByNumberOfPagesReturnBookResultWithMartenAsync(DETAILS_NUMBER_OF_PAGES, CancellationToken.None);
 
         // Assert
         result.Should()

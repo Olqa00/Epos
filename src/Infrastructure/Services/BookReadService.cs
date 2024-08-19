@@ -14,8 +14,19 @@ internal sealed class BookReadService : IBookReadService
     private const string GET_ID_AND_NUMBER = """
                                              SELECT (data ->> 'Id')::uuid AS "Id", (data -> 'Details' ->> 'NumberOfPages')::integer AS "NumberOfPages"
                                              FROM public.mt_doc_bookentity
-                                             WHERE (data -> 'Details' ->> 'NumberOfPages') = @Pages;
+                                             WHERE (data -> 'Details' ->> 'NumberOfPages') = @Pages
+                                             LIMIT 1;
                                              """;
+
+    private const string GET_ID_AND_NUMBER_AS_JSON = """
+                                                     SELECT json_build_object(
+                                                         'Id', (data ->> 'Id')::uuid,
+                                                         'NumberOfPages', (data -> 'Details' ->> 'NumberOfPages')::int
+                                                     ) AS result
+                                                     FROM public.mt_doc_bookentity
+                                                     WHERE (data -> 'Details' ->> 'NumberOfPages') = @Pages
+                                                     LIMIT 1;
+                                                     """;
 
     private readonly PersistenceOptions options;
 
@@ -71,8 +82,6 @@ internal sealed class BookReadService : IBookReadService
 
     public async Task<BookNumberOfPagesResult?> GetByNumberOfPagesReturnBookResultWithDapperAsync(int numberOfPages, CancellationToken cancellationToken = default)
     {
-        await using var session = this.storeReadService.QuerySession();
-
         var parameters = new
         {
             Pages = numberOfPages.ToString(),
@@ -81,7 +90,21 @@ internal sealed class BookReadService : IBookReadService
         await using var connection = new NpgsqlConnection(this.options.ConnectionStringReadService);
         //await connection.Open();
 
-        var result = (await connection.QueryAsync<BookNumberOfPagesResult>(GET_ID_AND_NUMBER, parameters)).FirstOrDefault();
+        var result = (await connection.QueryAsync<BookNumberOfPagesResult>(GET_ID_AND_NUMBER, parameters)).SingleOrDefault();
+
+        return result;
+    }
+
+    public async Task<BookNumberOfPagesResult?> GetByNumberOfPagesReturnBookResultWithMartenAsync(int numberOfPages, CancellationToken cancellationToken = default)
+    {
+        await using var session = this.storeReadService.QuerySession();
+
+        var parameters = new
+        {
+            Pages = numberOfPages.ToString(),
+        };
+
+        var result = (await session.QueryAsync<BookNumberOfPagesResult>(GET_ID_AND_NUMBER_AS_JSON, cancellationToken, parameters)).SingleOrDefault();
 
         return result;
     }
