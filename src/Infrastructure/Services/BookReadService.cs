@@ -2,33 +2,50 @@
 
 using Epos.Domain.Entities;
 using Epos.Infrastructure.Constants;
-using Epos.Infrastructure.Extensions;
 using Epos.Infrastructure.Interfaces;
 using Epos.Infrastructure.Result;
-using Npgsql;
-using NpgsqlTypes;
 
 internal sealed class BookReadService : IBookReadService
 {
+    private const string GET_BY_EXTERNAL_ID = """
+                                              SELECT json_build_object(
+                                                 'Id', (data ->> 'Id')::uuid,
+                                                 'EAN', data -> 'Details' ->> 'EAN',
+                                                 'SKU', data -> 'Details' ->> 'SKU'
+                                              ) AS result
+                                              FROM public.mt_doc_bookentity
+                                              WHERE ((data -> 'Details' ->> 'EAN') is not null and (data -> 'Details' ->> 'EAN') = @ExternalId) or ((data -> 'Details' ->> 'SKU')is not null and(data -> 'Details' ->> 'SKU') = @ExternalId)
+                                              LIMIT 1;
+                                              """;
+
     private const string GET_BY_NUMBER_OF_PAGES = """
-                                                  WHERE (data -> 'Details' ->> 'NumberOfPages') = ?;
+                                                  WHERE (data -> 'Details' ->> 'NumberOfPages') = @Pages;
                                                   """;
 
     private const string GET_ID_AND_NUMBER = """
-                                             SELECT (data ->> 'id'), (data -> 'Details' ->> 'NumberOfPages') AS "NumberOfPages"
+                                             SELECT (data ->> 'Id')::uuid AS "Id", (data -> 'Details' ->> 'NumberOfPages')::integer AS "NumberOfPages"
                                              FROM public.mt_doc_bookentity
+                                             WHERE (data -> 'Details' ->> 'NumberOfPages') = @Pages
+                                             LIMIT 1;
                                              """;
 
-    private const string GET_NUMBER_OF_PAGES = """
-                                               SELECT to_json(data -> 'Details' ->> 'NumberOfPages') AS "NumberOfPages"
-                                               FROM public.mt_doc_bookentity
-                                               WHERE (data -> 'Details' ->> 'NumberOfPages') is not null;
-                                               """;
+    private const string GET_ID_AND_NUMBER_AS_JSON = """
+                                                     SELECT json_build_object(
+                                                         'Id', (data ->> 'Id')::uuid,
+                                                         'NumberOfPages', (data -> 'Details' ->> 'NumberOfPages')::int
+                                                     ) AS result
+                                                     FROM public.mt_doc_bookentity
+                                                     WHERE (data -> 'Details' ->> 'NumberOfPages') = @Pages
+                                                     LIMIT 1;
+                                                     """;
+
+    private readonly PersistenceOptions options;
 
     private readonly IDocumentStore storeReadService;
 
-    public BookReadService(IDocumentStore storeReadService)
+    public BookReadService(PersistenceOptions options, IDocumentStore storeReadService)
     {
+        this.options = options;
         this.storeReadService = storeReadService;
     }
 
@@ -54,6 +71,20 @@ internal sealed class BookReadService : IBookReadService
         return book;
     }
 
+    public async Task<BookExternalIdResult?> GetByExternalIdSqlAsync(string externalId, CancellationToken cancellationToken = default)
+    {
+        await using var session = this.storeReadService.QuerySession();
+
+        var parameters = new
+        {
+            ExternalId = externalId,
+        };
+
+        var result = (await session.QueryAsync<BookExternalIdResult>(GET_BY_EXTERNAL_ID, cancellationToken, parameters)).SingleOrDefault();
+
+        return result;
+    }
+
     public async Task<BookEntity?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await using var session = this.storeReadService.QuerySession();
@@ -74,24 +105,31 @@ internal sealed class BookReadService : IBookReadService
         return book;
     }
 
-    public async Task<BookNumberOfPagesResult?> GetByNumberOfPagesReturnBookResultAsync(int numberOfPages, CancellationToken cancellationToken = default)
+    public async Task<BookNumberOfPagesResult?> GetByNumberOfPagesReturnBookResultWithDapperAsync(int numberOfPages, CancellationToken cancellationToken = default)
+    {
+        var parameters = new
+        {
+            Pages = numberOfPages.ToString(),
+        };
+
+        await using var connection = new NpgsqlConnection(this.options.ConnectionStringReadService);
+        //await connection.Open();
+
+        var result = (await connection.QueryAsync<BookNumberOfPagesResult>(GET_ID_AND_NUMBER, parameters)).SingleOrDefault();
+
+        return result;
+    }
+
+    public async Task<BookNumberOfPagesResult?> GetByNumberOfPagesReturnBookResultWithMartenAsync(int numberOfPages, CancellationToken cancellationToken = default)
     {
         await using var session = this.storeReadService.QuerySession();
 
-        var parameter = new NpgsqlParameter("Pages", NpgsqlDbType.Text)
+        var parameters = new
         {
-            Value = numberOfPages.ToString(),
+            Pages = numberOfPages.ToString(),
         };
 
-        var numberOfPagesJson = numberOfPages.ToString();
-
-        var (id, number) = session.AdvancedSql.Query<int, string>(GET_ID_AND_NUMBER)[0];
-
-        var result = new BookNumberOfPagesResult
-        {
-            Id = Guid.NewGuid(), //id,
-            NumberOfPages = 123, //number,
-        };
+        var result = (await session.QueryAsync<BookNumberOfPagesResult>(GET_ID_AND_NUMBER_AS_JSON, cancellationToken, parameters)).SingleOrDefault();
 
         return result;
     }
@@ -100,18 +138,12 @@ internal sealed class BookReadService : IBookReadService
     {
         await using var session = this.storeReadService.QuerySession();
 
-        var numberOfPagesJson = numberOfPages.ToJson();
-
-        var parameter = new NpgsqlParameter("Pages", NpgsqlDbType.Integer)
+        var parameters = new
         {
-            Value = numberOfPages.ToString(),
+            Pages = numberOfPages.ToString(),
         };
 
-        var books = await session.QueryAsync<BookEntity>(GET_BY_NUMBER_OF_PAGES, cancellationToken, numberOfPagesJson);
-
-        //var books = session.Query<BookEntity>(GET_BY_NUMBER_OF_PAGES, numberOfPagesJson);
-
-        //var book = session.Query<BookEntity>($"WHERE(data-> 'Details'->> 'NumberOfPages') = '{numberOfPages}';");
+        var books = await session.QueryAsync<BookEntity>(GET_BY_NUMBER_OF_PAGES, cancellationToken, parameters);
 
         return books;
     }

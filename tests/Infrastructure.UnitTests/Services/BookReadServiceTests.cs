@@ -55,7 +55,20 @@ public sealed class BookReadServiceTests
         NumberOfPages = DETAILS_NUMBER_OF_PAGES,
     };
 
+    private static readonly BookExternalIdResult BOOK_EXTERNAL_ID_RESULT = new()
+    {
+        Id = BOOK_ID_2,
+        EAN = EAN,
+        SKU = SKU,
+    };
+
     private readonly NpgsqlConnection connection = new(CONNECTION_STRING);
+
+    private readonly PersistenceOptions options = new()
+    {
+        ConnectionString = CONNECTION_STRING,
+    };
+
     private readonly DocumentStore store;
 
     private Respawner? respawner = default;
@@ -74,7 +87,7 @@ public sealed class BookReadServiceTests
     public async Task GetBooksAsync_Should_GetBooks()
     {
         // Arrange
-        var readService = new BookReadService(this.store);
+        var readService = new BookReadService(this.options, this.store);
         await readService.InsertAsync(BOOK_ID_1, TITLE, DETAILS, CancellationToken.None);
         await readService.InsertAsync(BOOK_ID_2, TITLE_2, DETAILS_WITH_EXTERNAL_ID, CancellationToken.None);
 
@@ -88,10 +101,74 @@ public sealed class BookReadServiceTests
     }
 
     [TestMethod]
+    public async Task GetByExternalIdAsync_Should_GetBookByEAN()
+    {
+        // Arrange
+        var readService = new BookReadService(this.options, this.store);
+        await readService.InsertAsync(BOOK_ID_2, TITLE_2, DETAILS_WITH_EXTERNAL_ID, CancellationToken.None);
+
+        // Act
+        var result = await readService.GetByExternalIdAsync(EAN, CancellationToken.None);
+
+        // Assert
+        result.Should()
+            .BeEquivalentTo(BOOK_ENTITY_2)
+            ;
+    }
+
+    [TestMethod]
+    public async Task GetByExternalIdAsync_Should_GetBookBySKU()
+    {
+        // Arrange
+        var readService = new BookReadService(this.options, this.store);
+        await readService.InsertAsync(BOOK_ID_2, TITLE_2, DETAILS_WITH_EXTERNAL_ID, CancellationToken.None);
+
+        // Act
+        var result = await readService.GetByExternalIdAsync(SKU, CancellationToken.None);
+
+        // Assert
+        result.Should()
+            .BeEquivalentTo(BOOK_ENTITY_2)
+            ;
+    }
+
+    [TestMethod]
+    public async Task GetByExternalIdSqlAsync_Should_GetBookByEAN()
+    {
+        // Arrange
+        var readService = new BookReadService(this.options, this.store);
+        await readService.InsertAsync(BOOK_ID_2, TITLE_2, DETAILS_WITH_EXTERNAL_ID, CancellationToken.None);
+
+        // Act
+        var result = await readService.GetByExternalIdSqlAsync(EAN, CancellationToken.None);
+
+        // Assert
+        result.Should()
+            .BeEquivalentTo(BOOK_EXTERNAL_ID_RESULT)
+            ;
+    }
+
+    [TestMethod]
+    public async Task GetByExternalIdSqlAsync_Should_GetBookBySKU()
+    {
+        // Arrange
+        var readService = new BookReadService(this.options, this.store);
+        await readService.InsertAsync(BOOK_ID_2, TITLE_2, DETAILS_WITH_EXTERNAL_ID, CancellationToken.None);
+
+        // Act
+        var result = await readService.GetByExternalIdSqlAsync(SKU, CancellationToken.None);
+
+        // Assert
+        result.Should()
+            .BeEquivalentTo(BOOK_EXTERNAL_ID_RESULT)
+            ;
+    }
+
+    [TestMethod]
     public async Task GetByIdAsync_Should_GetBook()
     {
         // Arrange
-        var readService = new BookReadService(this.store);
+        var readService = new BookReadService(this.options, this.store);
         await readService.InsertAsync(BOOK_ID_1, TITLE, DETAILS, CancellationToken.None);
 
         // Act
@@ -107,7 +184,7 @@ public sealed class BookReadServiceTests
     public async Task GetByNumberOfPagesAsync_Should_GetBook()
     {
         // Arrange
-        var readService = new BookReadService(this.store);
+        var readService = new BookReadService(this.options, this.store);
         await readService.InsertAsync(BOOK_ID_1, TITLE, DETAILS, CancellationToken.None);
 
         // Act
@@ -120,14 +197,30 @@ public sealed class BookReadServiceTests
     }
 
     [TestMethod]
-    public async Task GetByNumberOfPagesReturnBookResultAsync_Should_GetBook()
+    public async Task GetByNumberOfPagesReturnBookResultWithDapperAsync_Should_GetBook()
     {
         // Arrange
-        var readService = new BookReadService(this.store);
+        var readService = new BookReadService(this.options, this.store);
         await readService.InsertAsync(BOOK_ID_1, TITLE, DETAILS, CancellationToken.None);
 
         // Act
-        var result = await readService.GetByNumberOfPagesReturnBookResultAsync(DETAILS_NUMBER_OF_PAGES, CancellationToken.None);
+        var result = await readService.GetByNumberOfPagesReturnBookResultWithDapperAsync(DETAILS_NUMBER_OF_PAGES, CancellationToken.None);
+
+        // Assert
+        result.Should()
+            .BeEquivalentTo(BOOK_NUMBER_OF_PAGES_RESULT)
+            ;
+    }
+
+    [TestMethod]
+    public async Task GetByNumberOfPagesReturnBookResultWithMartenAsync_Should_GetBook()
+    {
+        // Arrange
+        var readService = new BookReadService(this.options, this.store);
+        await readService.InsertAsync(BOOK_ID_1, TITLE, DETAILS, CancellationToken.None);
+
+        // Act
+        var result = await readService.GetByNumberOfPagesReturnBookResultWithMartenAsync(DETAILS_NUMBER_OF_PAGES, CancellationToken.None);
 
         // Assert
         result.Should()
@@ -139,7 +232,7 @@ public sealed class BookReadServiceTests
     public async Task GetByNumberOfPagesWithScriptJsonAsync_Should_GetBook()
     {
         // Arrange
-        var readService = new BookReadService(this.store);
+        var readService = new BookReadService(this.options, this.store);
         await readService.InsertAsync(BOOK_ID_1, TITLE, DETAILS, CancellationToken.None);
 
         // Act
@@ -160,7 +253,7 @@ public sealed class BookReadServiceTests
     public async Task InsertAsync_Should_InsertBook()
     {
         // Arrange
-        var readService = new BookReadService(this.store);
+        var readService = new BookReadService(this.options, this.store);
 
         // Act
         await readService.InsertAsync(BOOK_ID_1, TITLE, DETAILS, CancellationToken.None);
@@ -180,12 +273,12 @@ public sealed class BookReadServiceTests
         // Arrange
         await this.connection.OpenAsync();
 
-        var options = new RespawnerOptions
+        var respawnerOptions = new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
         };
 
-        this.respawner = await Respawner.CreateAsync(this.connection, options);
+        this.respawner = await Respawner.CreateAsync(this.connection, respawnerOptions);
     }
 
     [TestCleanup]
